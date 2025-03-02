@@ -13,6 +13,8 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+    env:
+      AI_KEY: ${{ secrets.GROQ_AI_KEY }}
 
     steps:
     - uses: actions/checkout@v4
@@ -20,8 +22,3 @@ jobs:
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
-    - name: 'Create env file'
-      run: |
-          touch .env
-          echo API_KEY=${{ secrets.GROQ_AI_KEY }} >> .env
-          cat .env
