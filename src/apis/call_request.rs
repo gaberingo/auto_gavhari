@@ -1,4 +1,4 @@
-use crate::models::general::llm::{ChatCompletion, Message};
+use crate::models::general::llm::{APIMessage, APIResponse, ChatCompletion, Message};
 use dotenv::dotenv;
 use reqwest::{header::AUTHORIZATION, Client, RequestBuilder};
 use std::{env, fmt::format};
@@ -6,7 +6,7 @@ use std::{env, fmt::format};
 use reqwest::header::{HeaderMap, HeaderValue};
 
 // Call Large Language Model (i.e. GTP-4)
-pub async fn call_gpt(messages: Vec<Message>) {
+pub async fn call_gpt(messages: Vec<Message>) -> Result<String, Box<dyn std::error::Error + Send>> {
     dotenv().ok();
 
     // Extract API Key information
@@ -21,14 +21,22 @@ pub async fn call_gpt(messages: Vec<Message>) {
     // Create headers
     headers.insert(
         "Authorization",
-        HeaderValue::from_str(&format!("Bearer {}", api_key)).unwrap(),
+        HeaderValue::from_str(&format!("Bearer {}", api_key))
+            .map_err(|e| -> Box<dyn std::error::Error + Send> { Box::new(e) })?,
     );
 
-    headers.insert("Content-Type", HeaderValue::from_str(content_type).unwrap());
+    headers.insert(
+        "Content-Type",
+        HeaderValue::from_str(content_type)
+            .map_err(|e| -> Box<dyn std::error::Error + Send> { Box::new(e) })?,
+    );
 
     // Create DeepSeek AI Client
 
-    let client = Client::builder().default_headers(headers).build().unwrap();
+    let client = Client::builder()
+        .default_headers(headers)
+        .build()
+        .map_err(|e| -> Box<dyn std::error::Error + Send> { Box::new(e) })?;
 
     // Create chat completions
 
@@ -39,14 +47,26 @@ pub async fn call_gpt(messages: Vec<Message>) {
     };
 
     // Troubleshooting
-    let res_raw: reqwest::Response = client
+    // let res_raw: reqwest::Response = client
+    //     .post(url)
+    //     .json(&chat_completion)
+    //     .send()
+    //     .await
+    //     .unwrap();
+    //
+    // dbg!(res_raw.text().await.unwrap());
+
+    let response: APIResponse = client
         .post(url)
         .json(&chat_completion)
         .send()
         .await
-        .unwrap();
+        .map_err(|e| -> Box<dyn std::error::Error + Send> { Box::new(e) })?
+        .json()
+        .await
+        .map_err(|e| -> Box<dyn std::error::Error + Send> { Box::new(e) })?;
 
-    dbg!(res_raw.text().await.unwrap());
+    Ok(response.choices[0].message.content.clone())
 }
 
 #[cfg(test)]
@@ -62,6 +82,15 @@ mod tests {
 
         let messages: Vec<Message> = vec![message];
 
-        call_gpt(messages).await;
+        let res = call_gpt(messages).await;
+        match res {
+            Ok(api_str) => {
+                dbg!(api_str);
+                assert!(true);
+            }
+            Err(_) => {
+                assert!(false);
+            }
+        }
     }
 }
